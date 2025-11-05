@@ -1,43 +1,58 @@
-// 1) Correct base URL
-const BASE = "https://api.sam.gov/prod/opportunities/v2/search";
+// ✅ Omnix GovAI Finder - Fixed SAM.gov API (with correct date format)
 
 export default async function handler(req, res) {
   try {
-    const { searchParams } = new URL(req.url, 'http://x'); // node fetch route
-    const q           = searchParams.get('q') || '';
-    const naics       = searchParams.get('naics') || '';      // "333249,333318" etc.
-    const daysBack    = Number(searchParams.get('daysBack') || 90);
-    const minCeiling  = searchParams.get('minCeiling') || ''; // dollars
-    const limit       = searchParams.get('limit') || '25';
+    // --- STEP 1: Read inputs ---
+    const q = req.query.q || "robotics";
+    const naics = req.query.naics || "";
+    const limit = req.query.limit || "10";
+    const daysBack = parseInt(req.query.daysBack || "90", 10);
 
-    // 2) Required dates (SAM requires both)
-    const to  = new Date();
-    const fr  = new Date(to); fr.setDate(fr.getDate() - daysBack);
-    const postedFrom = fr.toISOString().slice(0,10); // YYYY-MM-DD
-    const postedTo   = to.toISOString().slice(0,10);
-
-    // 3) Build query
-    const params = new URLSearchParams({
-      api_key: process.env.SAM_API_KEY,   // keep it in env, not code
-      postedFrom, postedTo,
-      limit,
-    });
-
-    if (q)          params.set('q', q);
-    if (naics)      params.set('naics', naics);       // comma-separated
-    if (minCeiling) params.set('minAwardCeiling', minCeiling);
-
-    const url = `${BASE}?${params.toString()}`;
-    const r = await fetch(url, { headers: { Accept: "application/json" } });
-
-    if (!r.ok) {
-      const txt = await r.text();
-      throw new Error(`SAM.gov API error: ${txt}`);
+    // --- STEP 2: Build correct MM/dd/yyyy date range ---
+    function formatMMDDYYYY(date) {
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      const yyyy = String(date.getFullYear());
+      return `${mm}/${dd}/${yyyy}`;
     }
 
-    const data = await r.json();
+    const today = new Date();
+    const from = new Date(today);
+    from.setDate(today.getDate() - daysBack);
+
+    const postedFrom = formatMMDDYYYY(from);
+    const postedTo = formatMMDDYYYY(today);
+
+    // --- STEP 3: Build the SAM.gov URL ---
+    const base = "https://api.sam.gov/prod/opportunities/v2/search";
+    const params = new URLSearchParams({
+      api_key: process.env.SAM_API_KEY, // use your Vercel env key
+      q,
+      limit,
+      postedFrom,
+      postedTo,
+    });
+    if (naics) params.append("naics", naics);
+
+    const url = `${base}?${params.toString()}`;
+
+    // --- STEP 4: Call SAM.gov ---
+    const response = await fetch(url);
+    const text = await response.text();
+
+    // --- STEP 5: Try to parse JSON or return clean error ---
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return res.status(500).json({
+        error: "SAM.gov returned unexpected data",
+        snippet: text.slice(0, 300),
+      });
+    }
+
     res.status(200).json(data);
-  } catch (err) {
-    res.status(500).json({ error: String(err.message || err) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 }
