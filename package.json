@@ -1,6 +1,7 @@
 {
   "name": "omnix-govai-finder",
-  "version": "1.0.0",
   "private": true,
-  "engines": { "node": "18.x" }
+  "version": "1.0.0",
+  "type": "module",
+  "engines": { "node": "22.x" }
 }
