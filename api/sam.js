@@ -1,49 +1,12 @@
-export default async function handler(req, res) {
-  try {
-    if (!process.env.SAM_API_KEY) {
-      return res.status(500).json({ error: "Missing SAM_API_KEY" });
-    }
+const base = 'https://api.sam.gov/opportunities/v2/search';
+const url = new URL(base);
+url.searchParams.set('api_key', process.env.SAM_API_KEY);
+url.searchParams.set('postedFrom', postedFrom); // e.g. '2025-08-01'
+url.searchParams.set('postedTo', postedTo);     // e.g. '2025-11-04'
+url.searchParams.set('limit', String(limit || 25));
+if (keywords) url.searchParams.set('keywords', keywords);
+if (naics) url.searchParams.set('naics', naics);
 
-    const { q = "", naics = "", limit = "100", days, from, to } = req.query;
+const resp = await fetch(url.toString());
+const data = await resp.json();
 
-    // Build date range
-    const today = new Date();
-    const postedTo = (to ? new Date(to) : today).toISOString().slice(0, 10);
-    let postedFrom;
-    if (from) {
-      postedFrom = new Date(from).toISOString().slice(0, 10);
-    } else {
-      const lookback = Number.isFinite(+days) ? Math.max(1, parseInt(days, 10)) : 90;
-      const d = new Date(today);
-      d.setDate(d.getDate() - lookback);
-      postedFrom = d.toISOString().slice(0, 10);
-    }
-
-    // Build query
-    const params = new URLSearchParams({
-      api_key: process.env.SAM_API_KEY,
-      postedFrom,
-      postedTo,
-      limit,
-      sort: "-publishDate",
-    });
-
-    if (q) params.append("q", q);
-    if (naics) params.append("naics", naics);
-
-    const url = `https://api.sam.gov/opportunities/v2/search?${params.toString()}`;
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error("SAM.gov API Error:", text);
-      return res.status(response.status).json({ error: text });
-    }
-
-    const data = await response.json();
-    return res.status(200).json(data);
-  } catch (err) {
-    console.error("Server Error:", err);
-    return res.status(500).json({ error: err.message });
-  }
-}
