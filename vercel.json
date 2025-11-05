@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "functions": {
-    "api/**/*.js": { "runtime": "nodejs18.x" }
-  }
+  "name": "omnix-govai-finder",
+  "private": true,
+  "version": "1.0.0",
+  "engines": { "node": "18.x" }
 }
