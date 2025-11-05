@@ -1,12 +1,21 @@
-const base = 'https://api.sam.gov/opportunities/v2/search';
-const url = new URL(base);
-url.searchParams.set('api_key', process.env.SAM_API_KEY);
-url.searchParams.set('postedFrom', postedFrom); // e.g. '2025-08-01'
-url.searchParams.set('postedTo', postedTo);     // e.g. '2025-11-04'
-url.searchParams.set('limit', String(limit || 25));
-if (keywords) url.searchParams.set('keywords', keywords);
-if (naics) url.searchParams.set('naics', naics);
+export default async function handler(req, res) {
+  try {
+    const { q = "robotics", postedFrom = "2024-08-01", postedTo = "2024-11-01" } = req.query;
 
-const resp = await fetch(url.toString());
-const data = await resp.json();
+    const response = await fetch(
+      `https://api.data.gov/sam/v1/opportunities/search?api_key=${process.env.SAM_API_KEY}&q=${q}&postedFrom=${postedFrom}&postedTo=${postedTo}`
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`SAM.gov API error: ${text}`);
+    }
+
+    const data = await response.json();
+    res.status(200).json(data);
+  } catch (err) {
+    console.error("Error fetching SAM.gov data:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
 
